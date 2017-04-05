@@ -66,7 +66,7 @@ fun accessStr(name: String): String = if (hasSpecialChars(name)) "[${name.quote(
 
 @Suppress("ConvertLambdaToReference")
 @Singleton
-class JsGenerator(injector: Injector) : SingleFileCommonGenerator(injector) {
+class JsGenerator(injector: Injector) : CommonGenerator(injector) {
 	override val methodFeatures = super.methodFeatures + setOf(SwitchFeature::class.java)
 	override val keywords = super.keywords + setOf("name", "constructor", "prototype", "__proto__", "G", "N", "S", "SS", "IO")
 	override val stringPoolType = StringPool.Type.GLOBAL
@@ -274,7 +274,7 @@ class JsGenerator(injector: Injector) : SingleFileCommonGenerator(injector) {
 
 	private fun AstMethod.getJsNativeBodies(): Map<String, Indenter> = this.getNativeBodies(target = "js")
 
-	override fun genClass(clazz: AstClass): Indenter {
+	override fun genClass(clazz: AstClass, kind: MemberTypes): Indenter {
 		setCurrentClass(clazz)
 
 		val isAbstract = (clazz.classType == AstClassType.ABSTRACT)

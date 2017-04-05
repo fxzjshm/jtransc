@@ -69,7 +69,7 @@ class CppTarget : GenTargetDescriptor() {
 }
 
 @Singleton
-class CppGenerator(injector: Injector) : SingleFileCommonGenerator(injector) {
+class CppGenerator(injector: Injector) : CommonGenerator(injector) {
 	override val methodFeatures = setOf(SwitchFeature::class.java, GotosFeature::class.java)
 	override val methodFeaturesWithTraps = setOf(SwitchFeature::class.java)
 	override val keywords = setOf(

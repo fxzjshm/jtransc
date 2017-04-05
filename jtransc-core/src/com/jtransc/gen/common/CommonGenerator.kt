@@ -33,6 +33,7 @@ import com.jtransc.vfs.MergeVfs
 import com.jtransc.vfs.SyncVfsFile
 import java.io.File
 import java.util.*
+import kotlin.collections.LinkedHashMap
 import kotlin.reflect.KMutableProperty1
 
 class ConfigSrcFolder(val srcFolder: SyncVfsFile)
@@ -45,7 +46,9 @@ open class CommonGenerator(val injector: Injector) : IProgramTemplate {
 	open val stringPoolType: StringPool.Type = StringPool.Type.GLOBAL
 	open val languageRequiresDefaultInSwitch = false
 	open val defaultGenStmSwitchHasBreaks = true
-	open val interfacesSupportStaticMembers = true
+	open val supportStaticMembersInInterfaces = true
+	open val supportsAbstractClasses = true
+	open val supportsMultipleClassesPerFile = true
 
 	val configTargetFolder: ConfigTargetFolder = injector.get()
 	val program: AstProgram = injector.get()
@@ -124,6 +127,27 @@ open class CommonGenerator(val injector: Injector) : IProgramTemplate {
 	}
 
 	open fun writeClasses(output: SyncVfsFile) {
+		if (supportsMultipleClassesPerFile) {
+			output[outputFileBaseName] = genClasses(output).toString()
+		} else {
+			for (clazz in sortedClasses) {
+				for ((file, content) in genClassFiles(clazz)) {
+					output[file] = content.toString()
+				}
+				//output[getClassFilename(clazz)] = genClass(clazz).toString()
+			}
+		}
+	}
+
+	open fun getClassBaseFilename(clazz: AstClass) = clazz.actualFqName.fqname.replace('.', '/')
+
+	open fun getClassFilename(clazz: AstClass, kind: MemberTypes): String {
+		val suffix = when (kind) {
+			MemberTypes.STATIC -> "_IFields"
+			else -> ""
+		}
+
+		return getClassBaseFilename(clazz) + suffix
 	}
 
 	val indenterPerClass = hashMapOf<AstClass, Indenter>()
@@ -138,45 +162,73 @@ open class CommonGenerator(val injector: Injector) : IProgramTemplate {
 
 	open fun genClassesWithoutAppends(output: SyncVfsFile): Indenter = Indenter.gen {
 		for (clazz in sortedClasses) {
-			val indenter = if (clazz.implCode != null) Indenter(clazz.implCode!!) else genClass(clazz)
+			val files = genClassFiles(clazz)
+			val indenter = files.map { it.value }.reduce { l, r -> l + r }
 			indenterPerClass[clazz] = indenter
 			line(indenter)
 		}
 	}
 
-	open fun genClass(clazz: AstClass): Indenter = Indenter.gen {
+	open fun genClassFiles(clazz: AstClass): Map<String, Indenter> {
 		setCurrentClass(clazz)
 
-		if (interfacesSupportStaticMembers || !clazz.isInterface) {
-			line(genClassDecl(clazz, MemberTypes.ALL)) {
-				line(genClassBody(clazz, MemberTypes.ALL))
-			}
+		if (clazz.implCode != null) {
+			return mapOf(getClassFilename(clazz, MemberTypes.ALL) to Indenter(clazz.implCode!!))
 		} else {
-			line(genClassDecl(clazz, MemberTypes.INSTANCE)) {
-				line(genClassBody(clazz, MemberTypes.INSTANCE))
+			val out = LinkedHashMap<String, Indenter>()
+
+			fun emit(pair: Pair<String, Indenter>, kind: MemberTypes) {
+				val (file, content) = pair
+				if (!out.containsKey(file)) {
+					out[file] = Indenter { }
+				}
+				//println("Generating: ${file} : $kind")
+				out[file] = out[file]!! + content
 			}
-			line(genClassDecl(clazz, MemberTypes.STATIC)) {
-				line(genClassBody(clazz, MemberTypes.STATIC))
+
+			if (clazz.isInterface && !supportStaticMembersInInterfaces) {
+				emit(genClassFile(clazz, MemberTypes.INSTANCE), MemberTypes.INSTANCE)
+				emit(genClassFile(clazz, MemberTypes.STATIC), MemberTypes.STATIC)
+			} else {
+				emit(genClassFile(clazz, MemberTypes.ALL), MemberTypes.ALL)
 			}
+
+			return out
 		}
 	}
 
-	enum class MemberTypes(val isStatic: Boolean) {
-		ALL(false), INSTANCE(false), STATIC(true);
+	open fun genClassFile(clazz: AstClass, kind: MemberTypes): Pair<String, Indenter> {
+		setCurrentClass(clazz)
+		return getClassFilename(clazz, kind) to genClass(clazz, kind)
+	}
 
-		fun check(member: AstMember) = when (this) {
-			ALL -> true
-			INSTANCE -> !member.isStatic
-			STATIC -> member.isStatic
+	open fun genClass(clazz: AstClass, kind: MemberTypes): Indenter = Indenter {
+		setCurrentClass(clazz)
+		line(genClassDecl(clazz, kind)) {
+			line(genClassBody(clazz, kind))
 		}
+	}
+
+	enum class MemberTypes(
+		val includeStatics: Boolean,
+		val includeInstances: Boolean
+	) {
+		ALL(includeStatics = true, includeInstances = true),
+		INSTANCE(includeStatics = false, includeInstances = true),
+		STATIC(includeStatics = true, includeInstances = false);
+
+		fun check(member: AstMember) = if (member.isStatic) includeStatics else includeInstances
 	}
 
 	open fun genClassDecl(clazz: AstClass, kind: MemberTypes): String {
 		val CLASS = if (clazz.isInterface) "interface" else "class"
 		val iabstract = if (clazz.isAbstract) "abstract " else ""
-		var decl = "$iabstract$CLASS ${clazz.name.targetSimpleName}"
-		decl += genClassDeclExtendsImplements(clazz, kind)
-		return decl
+		val simpleClassName = when (kind) {
+			MemberTypes.ALL, MemberTypes.INSTANCE -> clazz.name.targetSimpleName
+			MemberTypes.STATIC -> clazz.name.targetNameForStatic
+		}
+		val inheritance = genClassDeclExtendsImplements(clazz, kind)
+		return "$iabstract$CLASS $simpleClassName$inheritance"
 	}
 
 	protected open fun genClassDeclExtendsImplements(clazz: AstClass, kind: MemberTypes): String {
@@ -198,6 +250,7 @@ open class CommonGenerator(val injector: Injector) : IProgramTemplate {
 	protected open fun getClassInterfaces(clazz: AstClass): List<FqName> = clazz.implementing
 
 	open fun genClassBody(clazz: AstClass, kind: MemberTypes): Indenter = Indenter.gen {
+		//println("genClassBody: ${clazz.name} : $kind")
 		val members = clazz.annotationsList.getTypedList(JTranscAddMembersList::value).filter { it.target == targetName.name }.flatMap { it.value.toList() }.joinToString("\n")
 		line(gen(members, process = true))
 		line(genClassBodyFields(clazz, kind))
@@ -208,11 +261,17 @@ open class CommonGenerator(val injector: Injector) : IProgramTemplate {
 	}
 
 	open fun genClassBodyFields(clazz: AstClass, kind: MemberTypes): Indenter = Indenter.gen {
-		for (f in clazz.fields) if (kind.check(f)) line(genField(f))
+		//println("${clazz.name} : $kind:")
+		for (f in clazz.fields) {
+			//println("${clazz.name} : name=${f.name} : static=${f.isStatic} : including=${kind.check(f)}, $kind")
+			if (kind.check(f)) line(genField(f))
+		}
 	}
 
 	open fun genClassBodyMethods(clazz: AstClass, kind: MemberTypes): Indenter = Indenter.gen {
-		for (m in clazz.methods) if (kind.check(m)) line(genMethod(clazz, m, !clazz.isInterface || m.isStatic))
+		for (m in clazz.methods) {
+			if (kind.check(m)) line(genMethod(clazz, m, !clazz.isInterface || m.isStatic))
+		}
 	}
 
 	open fun genSIMethod(clazz: AstClass): Indenter = Indenter.gen {
@@ -1721,7 +1780,7 @@ open class CommonGenerator(val injector: Injector) : IProgramTemplate {
 	open val FqName.targetName: String get() = this.fqname.replace('.', '_').replace('$', '_')
 	open val FqName.targetClassFqName: String get() = this.targetName
 	open val FqName.targetSimpleName: String get() = this.simpleName
-	open val FqName.targetNameForStatic: String get() = if (!program[this].isInterface || interfacesSupportStaticMembers) this.targetName else this.targetName + "_IFields"
+	open val FqName.targetNameForStatic: String get() = if (!program[this].isInterface || supportStaticMembersInInterfaces) this.targetName else this.targetName + "_IFields"
 	open val FqName.targetFilePath: String get() = this.simpleName
 	open val FqName.targetGeneratedFqName: FqName get() = this
 	open val FqName.targetGeneratedFqPackage: String get() = this.packagePath

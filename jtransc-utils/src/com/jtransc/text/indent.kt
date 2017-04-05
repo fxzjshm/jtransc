@@ -45,6 +45,11 @@ class Indenter(private val actions: ArrayList<Action> = arrayListOf<Indenter.Act
 
 	val noIndentEmptyLines = true
 
+	operator fun plus(that: Indenter): Indenter = Indenter(arrayListOf<Action>().apply {
+		this.addAll(this@Indenter.actions)
+		this.addAll(that.actions)
+	})
+
 	companion object {
 		fun genString(init: Indenter.() -> Unit) = gen(init).toString()
 

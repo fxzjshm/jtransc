@@ -14,7 +14,10 @@ import java.io.File
 // For more information on the platform-specific location of this file, see Editing the mm.cfg file.
 object As3Compiler {
 	val AIRSDK_HOME by lazy {
-		System.getenv("AIRSDK_HOME") ?: System.getenv("AIRSDK") ?: invalidOp("AIRSDK_HOME or AIRSDK environment variables not defined")
+		System.getenv("AIRSDK_HOME")
+			?: System.getenv("AIRSDK")
+			?: (if (File("/opt/airsdk").exists()) "/opt/airsdk" else null)
+			?: invalidOp("AIRSDK_HOME or AIRSDK environment variables not defined")
 	}
 
 	val AIRSDK_BIN by lazy {

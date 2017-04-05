@@ -54,12 +54,11 @@ class CSharpTarget : GenTargetDescriptor() {
 }
 
 @Singleton
-class CSharpGenerator(injector: Injector) : SingleFileCommonGenerator(injector) {
-	//class DGenerator(injector: Injector) : FilePerClassCommonGenerator(injector) {
+class CSharpGenerator(injector: Injector) : CommonGenerator(injector) {
 	override val methodFeatures = setOf(SwitchFeature::class.java, GotosFeature::class.java)
 	override val methodFeaturesWithTraps = setOf(SwitchFeature::class.java)
 	override val stringPoolType: StringPool.Type = StringPool.Type.GLOBAL
-	override val interfacesSupportStaticMembers: Boolean = false
+	override val supportStaticMembersInInterfaces: Boolean = false
 
 	override val keywords = setOf(
 		"abstract", "alias", "align", "asm", "assert", "auto",
@@ -226,7 +225,7 @@ class CSharpGenerator(injector: Injector) : SingleFileCommonGenerator(injector) 
 	}
 
 	override fun genClassDecl(clazz: AstClass, kind: MemberTypes): String {
-		if (kind.isStatic) {
+		if (kind == MemberTypes.STATIC) {
 			return "class ${clazz.name.targetNameForStatic}"
 		} else {
 			val CLASS = if (clazz.isInterface) "interface" else "class"

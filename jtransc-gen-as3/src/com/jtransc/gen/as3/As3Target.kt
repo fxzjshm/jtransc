@@ -55,12 +55,13 @@ class As3Target : GenTargetDescriptor() {
 }
 
 @Singleton
-class As3Generator(injector: Injector) : FilePerClassCommonGenerator(injector) {
-	//class DGenerator(injector: Injector) : FilePerClassCommonGenerator(injector) {
+class As3Generator(injector: Injector) : CommonGenerator(injector) {
 	override val methodFeatures = setOf(SwitchFeature::class.java, GotosFeature::class.java)
 	override val methodFeaturesWithTraps = setOf(SwitchFeature::class.java)
 	override val stringPoolType: StringPool.Type = StringPool.Type.GLOBAL
-	override val interfacesSupportStaticMembers: Boolean = false
+	override val supportStaticMembersInInterfaces: Boolean = false
+	override val supportsAbstractClasses = false
+	override val supportsMultipleClassesPerFile = false
 
 	override val keywords = setOf(
 		"abstract", "alias", "align", "asm", "assert", "auto",
@@ -104,12 +105,12 @@ class As3Generator(injector: Injector) : FilePerClassCommonGenerator(injector) {
 		params["STATIC_CONSTRUCTORS"] = genStaticConstructorsSortedLines()
 	}
 
-	@Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
+	//@Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
 	private fun _getActualFqName(name: FqName): FqName {
 		val realclass = if (name in program) program[name] else null
 		return FqName(classNames.getOrPut2(name) {
 			if (realclass?.nativeName != null) {
-				realclass!!.nativeName!!
+				realclass.nativeName!!
 			} else {
 				FqName(name.packageParts.map { if (it in keywords) "${it}_" else it }.map(String::decapitalize), "${name.simpleName.replace('$', '_')}_".capitalize()).fqname
 			}
@@ -118,8 +119,13 @@ class As3Generator(injector: Injector) : FilePerClassCommonGenerator(injector) {
 
 	//override fun getClassBaseFilename(clazz: AstClass): String = clazz.actualFqName.fqname.replace('.', '/').replace('$', '_')
 	//override fun getClassBaseFilename(clazz: AstClass): String = clazz.actualFqName.fqname.replace('.', '/').replace('$', '_')
-	override fun getClassBaseFilename(clazz: AstClass): String = clazz.fqname.replace('.', '_').replace('$', '_')
-	override fun getClassFilename(clazz: AstClass) = getClassBaseFilename(clazz) + ".as"
+
+	override fun getClassBaseFilename(clazz: AstClass): String = if (supportsMultipleClassesPerFile) {
+		clazz.actualFqName.fqname.replace('.', '/')
+	} else {
+		clazz.fqname.replace('.', '_').replace('$', '_')
+	}
+	override fun getClassFilename(clazz: AstClass, kind: MemberTypes) = super.getClassFilename(clazz, kind) + ".as"
 
 	override val FqName.targetName: String get() = this.fqname.replace('.', '_').replace('$', '_')
 	//override val FqName.targetName: String get() = this.actualFqName.fqname.replace('$', '_')
@@ -145,9 +151,9 @@ class As3Generator(injector: Injector) : FilePerClassCommonGenerator(injector) {
 		line("public ${static}var ${field.targetName}: ${field.type.targetName} = ${field.type.getNull().escapedConstant};")
 	}
 
-	override fun genClass(clazz: AstClass): Indenter = Indenter {
+	override fun genClass(clazz: AstClass, kind: MemberTypes): Indenter = Indenter {
 		line("package") {
-			line(super.genClass(clazz))
+			line(super.genClass(clazz, kind))
 		}
 	}
 
@@ -201,9 +207,13 @@ class As3Generator(injector: Injector) : FilePerClassCommonGenerator(injector) {
 
 	override fun genClassDecl(clazz: AstClass, kind: MemberTypes): String {
 		val CLASS = if (clazz.isInterface) "interface" else "class"
-		var decl = "public $CLASS ${clazz.name.targetSimpleName}"
-		decl += genClassDeclExtendsImplements(clazz, kind)
-		return decl
+		val simpleClassName = when (kind) {
+			MemberTypes.ALL, MemberTypes.INSTANCE -> clazz.name.targetSimpleName
+			MemberTypes.STATIC -> clazz.name.targetNameForStatic
+		}
+		val inheritance = genClassDeclExtendsImplements(clazz, kind)
+		return "public $CLASS $simpleClassName$inheritance"
+
 	}
 
 	override val AstLocal.decl: String get() = "var ${this.targetName}: ${this.type.localDeclType} = ${this.type.nativeDefaultString};"

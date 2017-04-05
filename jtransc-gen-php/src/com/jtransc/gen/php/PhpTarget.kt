@@ -50,7 +50,7 @@ class PhpTarget : GenTargetDescriptor() {
 }
 
 @Singleton
-class PhpGenerator(injector: Injector) : SingleFileCommonGenerator(injector) {
+class PhpGenerator(injector: Injector) : CommonGenerator(injector) {
 	//class DGenerator(injector: Injector) : FilePerClassCommonGenerator(injector) {
 	override val staticAccessOperator: String = "::"
 	override val instanceAccessOperator: String = "->"
@@ -58,7 +58,7 @@ class PhpGenerator(injector: Injector) : SingleFileCommonGenerator(injector) {
 	override val methodFeatures = setOf(SwitchFeature::class.java, GotosFeature::class.java)
 	override val methodFeaturesWithTraps = setOf(SwitchFeature::class.java)
 	override val stringPoolType: StringPool.Type = StringPool.Type.GLOBAL
-	override val interfacesSupportStaticMembers: Boolean = false
+	override val supportStaticMembersInInterfaces: Boolean = false
 
 	override val keywords = setOf(
 		"abstract", "alias", "align", "asm", "assert", "auto",
@@ -225,7 +225,7 @@ class PhpGenerator(injector: Injector) : SingleFileCommonGenerator(injector) {
 	}
 
 	override fun genClassDecl(clazz: AstClass, kind: MemberTypes): String {
-		return if (kind.isStatic) {
+		return if (kind == MemberTypes.STATIC) {
 			"class ${clazz.name.targetNameForStatic}"
 		} else {
 			super.genClassDecl(clazz, kind)

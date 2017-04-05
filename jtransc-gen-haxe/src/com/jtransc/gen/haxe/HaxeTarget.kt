@@ -89,9 +89,10 @@ class HaxeTarget() : GenTargetDescriptor() {
 }
 
 @Singleton
-class HaxeGenerator(injector: Injector) : FilePerClassCommonGenerator(injector) {
+class HaxeGenerator(injector: Injector) : CommonGenerator(injector) {
 	val haxeConfigMergedAssetsFolder: HaxeConfigMergedAssetsFolder? = injector.getOrNull()
 	val configHaxeAddSubtarget: ConfigHaxeAddSubtarget? = injector.getOrNull()
+	override val supportsMultipleClassesPerFile: Boolean = false
 
 	//val unreflective = "@:unreflective"
 	val unreflective = ""
@@ -144,9 +145,22 @@ class HaxeGenerator(injector: Injector) : FilePerClassCommonGenerator(injector) 
 	//override val outputFile2 = configOutputFile2.file
 
 	override fun writeProgramAndFiles() {
-		_write()
-		setTemplateParamsAfterBuildingSource()
+		if (supportsMultipleClassesPerFile) {
+			_write()
+			setTemplateParamsAfterBuildingSource()
+		} else {
+			val output = configTargetFolder.targetFolder
+			writeClasses(output)
+			setTemplateParamsAfterBuildingSource()
+			for (file in getFilesToCopy(targetName.name)) {
+				val str = program.resourcesVfs[file.src].readString()
+				val strr = if (file.process) str.template("includeFile") else str
+				output[file.dst] = strr
+			}
+		}
 	}
+
+	override fun getClassFilename(clazz: AstClass, kind: MemberTypes) = getClassBaseFilename(clazz)
 
 	fun haxeCopyEmbeddedResourcesToFolder(assetsFolder: File?) {
 		val files = program.allAnnotationsList.getAllTyped<HaxeAddAssets>().flatMap { it.value.toList() }
