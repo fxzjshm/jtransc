@@ -160,7 +160,7 @@ class HaxeGenerator(injector: Injector) : CommonGenerator(injector) {
 		}
 	}
 
-	override fun getClassFilename(clazz: AstClass, kind: MemberTypes) = getClassBaseFilename(clazz)
+	override fun getClassFilename(clazz: AstClass, kind: MemberTypes) = getClassBaseFilename(clazz) + ".hx"
 
 	fun haxeCopyEmbeddedResourcesToFolder(assetsFolder: File?) {
 		val files = program.allAnnotationsList.getAllTyped<HaxeAddAssets>().flatMap { it.value.toList() }
@@ -269,7 +269,9 @@ class HaxeGenerator(injector: Injector) : CommonGenerator(injector) {
 				vfs[clazz.name.targetFilePath] = clazz.implCode!!
 			} else {
 				//try {
-				writeClass(clazz, vfs)
+				for ((file, content) in genClassFiles(clazz)) {
+					vfs[file] = content.toString()
+				}
 				//} catch (e: InvalidOperationException) {
 				//	invalidOp("${e.message} while generating $context", e)
 				//}
@@ -476,7 +478,8 @@ class HaxeGenerator(injector: Injector) : CommonGenerator(injector) {
 		}
 	}
 
-	fun writeClass(clazz: AstClass, vfs: SyncVfsFile) {
+	//fun writeClass(clazz: AstClass, vfs: SyncVfsFile) {
+	override fun genClassFiles(clazz: AstClass): Map<String, Indenter> {
 		setCurrentClass(clazz)
 
 		val isRootObject = clazz.name.fqname == "java.lang.Object"
@@ -633,15 +636,11 @@ class HaxeGenerator(injector: Injector) : CommonGenerator(injector) {
 			}
 		}
 
-		val lineMappings = hashMapOf<Int, Int>()
 
-		val fileStr = classCodeIndenter.toString { sb, line, data ->
-			if (data is AstStm.LINE) lineMappings[line] = data.line
-		}
 
-		val haxeFilePath = clazz.name.targetFilePath
-		vfs[haxeFilePath] = fileStr
-		vfs["$haxeFilePath.map"] = Sourcemaps.encodeFile(vfs[haxeFilePath].realpathOS, fileStr, clazz.source, lineMappings)
+		//val haxeFilePath = clazz.name.targetFilePath
+		//vfs[haxeFilePath] = fileStr
+		return mapOf(clazz.name.targetFilePath to classCodeIndenter)
 	}
 
 	override fun buildStaticInit(clazzName: FqName) = null

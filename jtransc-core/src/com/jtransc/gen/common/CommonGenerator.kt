@@ -23,6 +23,7 @@ import com.jtransc.io.ProcessResult2
 import com.jtransc.lang.high
 import com.jtransc.lang.low
 import com.jtransc.lang.putIfAbsentJre7
+import com.jtransc.sourcemaps.Sourcemaps
 import com.jtransc.template.Minitemplate
 import com.jtransc.text.Indenter
 import com.jtransc.text.isLetterDigitOrUnderscore
@@ -49,6 +50,7 @@ open class CommonGenerator(val injector: Injector) : IProgramTemplate {
 	open val supportStaticMembersInInterfaces = true
 	open val supportsAbstractClasses = true
 	open val supportsMultipleClassesPerFile = true
+	open val generateSourceMaps = false
 
 	val configTargetFolder: ConfigTargetFolder = injector.get()
 	val program: AstProgram = injector.get()
@@ -132,7 +134,16 @@ open class CommonGenerator(val injector: Injector) : IProgramTemplate {
 		} else {
 			for (clazz in sortedClasses) {
 				for ((file, content) in genClassFiles(clazz)) {
-					output[file] = content.toString()
+					if (generateSourceMaps) {
+						val lineMappings = LinkedHashMap<Int, Int>()
+						val fileStr = content.toString { sb, line, data ->
+							if (data is AstStm.LINE) lineMappings[line] = data.line
+						}
+						output[file] = fileStr
+						output["file.map"] = Sourcemaps.encodeFile(output[file].realpathOS, fileStr, clazz.source, lineMappings)
+					} else {
+						output[file] = content.toString()
+					}
 				}
 				//output[getClassFilename(clazz)] = genClass(clazz).toString()
 			}
