@@ -145,9 +145,10 @@ class HaxeGenerator(injector: Injector) : CommonGenerator(injector) {
 	//override val outputFile2 = configOutputFile2.file
 
 	override fun writeProgramAndFiles() {
-		if (supportsMultipleClassesPerFile) {
+		//if (supportsMultipleClassesPerFile) {
 			_write()
 			setTemplateParamsAfterBuildingSource()
+		/*
 		} else {
 			val output = configTargetFolder.targetFolder
 			writeClasses(output)
@@ -158,6 +159,7 @@ class HaxeGenerator(injector: Injector) : CommonGenerator(injector) {
 				output[file.dst] = strr
 			}
 		}
+		*/
 	}
 
 	override fun getClassFilename(clazz: AstClass, kind: MemberTypes) = getClassBaseFilename(clazz) + ".hx"
