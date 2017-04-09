@@ -132,6 +132,9 @@ open class CommonGenerator(val injector: Injector) : IProgramTemplate {
 		if (supportsMultipleClassesPerFile) {
 			output[outputFileBaseName] = genClasses(output).toString()
 		} else {
+			for ((file, content) in genExtraClassFiles()) {
+				output[file] = content.toString()
+			}
 			for (clazz in sortedClasses) {
 				for ((file, content) in genClassFiles(clazz)) {
 					if (generateSourceMaps) {
@@ -178,6 +181,10 @@ open class CommonGenerator(val injector: Injector) : IProgramTemplate {
 			indenterPerClass[clazz] = indenter
 			line(indenter)
 		}
+	}
+
+	open fun genExtraClassFiles(): Map<String, Indenter> {
+		return mapOf()
 	}
 
 	open fun genClassFiles(clazz: AstClass): Map<String, Indenter> {

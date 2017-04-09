@@ -139,10 +139,19 @@ class As3Generator(injector: Injector) : CommonGenerator(injector) {
 		return ProcessResult2(RootLocalVfs().exec(cmdAndArgs, ExecOptions(passthru = redirect, sysexec = true)))
 	}
 
-	override fun writeClasses(output: SyncVfsFile) {
-		//println(program.resourcesVfs)
-		super.writeClasses(output)
-		println(output)
+	override fun genExtraClassFiles(): Map<String, Indenter> {
+		return mapOf(
+			"Main.as" to Indenter {
+				line("package") {
+					line("import flash.display.Sprite;")
+					line("public class Main extends flash.display.Sprite") {
+						line("static public function main():void") {
+
+						}
+					}
+				}
+			}
+		)
 	}
 
 	override fun genField(field: AstField): Indenter = Indenter.gen {
