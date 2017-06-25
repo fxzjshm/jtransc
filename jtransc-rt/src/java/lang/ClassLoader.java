@@ -176,7 +176,7 @@ public abstract class ClassLoader {
 	native public void setClassAssertionStatus(String className, boolean enabled);
 
 	native public void clearAssertionStatus();
-
+/*
 	void loadLibrary(Class fromClass, String name, boolean isAbsolute) {
 		if (JTranscSystem.isCpp()) {
 			NativeLib nativeLib = new NativeLib(loadLibrarayCpp(name), name);
@@ -197,5 +197,5 @@ public abstract class ClassLoader {
 
 	@JTranscMethodBody(target = "cpp", value = "N::jtvmUnLoadDynamicLibraray(jlong_to_ptr(p0));")
 	private static void unLoadLibrarayCpp(long handle) {
-	}
+	}*/
 }
